@@ -1,0 +1,838 @@
+                        pl out mch
+                        pl [2]d mar
+                        
+                        pl set_working_dimensions mdr
+                        st
+                        pl clear_buffers mdr
+                        st
+                        pl show_window mdr
+                        st
+
+                        cl load_persistent
+
+                        pl out mch
+                        pl [2]d mar
+                        pl set_window_title mdr
+                        st
+
+main_loop:              cl detect_snake_collision
+                        mv snake_collision acc
+                        js end
+                        mv snake_apple_collision acc
+                        jc apple_not_found
+
+                        cl reposition_apple
+                        cl grow_snake
+                        cl increment_score
+
+apple_not_found:        cl process_input
+                        cl move_snake
+
+                        cl draw_background
+                        cl draw_apple
+                        cl draw_snake
+                        cl set_colour_to_apple
+
+                        pl out mch
+                        pl [2]d mar
+
+                        pl swap_buffers mdr
+                        st
+                        pl get_window_closure mdr
+                        st
+
+                        pl [30000]d acc
+tick_delay:             ad
+                        js tick_delay
+
+                        pl mem mch
+                        pl window_closure mar
+                        ld
+                        mv mdr acc
+                        jc main_loop
+
+end:                    cl save_persistent
+                        fi
+
+; Functions:
+
+save_persistent:        pl [1]d mar
+                        cl reset_filepointer
+                        pl [3]d gp0
+                        pl highscore gp1
+                        pl highscore mar
+
+save_persistent_loop:   pl mem mch
+                        ld
+                        pl [1]d mar
+                        pl out mch
+                        st
+                        mv gp0 acc
+                        ad
+                        jc save_persistent_end
+
+                        mv acc gp0
+                        mv gp1 acc
+                        ai
+                        mv acc gp1
+                        mv gp1 mar
+                        jm save_persistent_loop
+
+save_persistent_end:    rt
+
+load_persistent:        pl [1]d mar
+
+                        cl reset_filepointer
+
+                        pl out mch
+                        ld
+                        mv mdr acc
+                        js retrieve_stored_data
+
+                        cl reset_filepointer
+
+                        pl out mch
+                        pl [0]s mdr
+                        pl [3]d acc
+
+write_blank_data:       st
+                        ad
+                        js write_blank_data
+
+                        rt
+
+retrieve_stored_data:   cl reset_filepointer
+                        pl [3]d gp0
+                        pl highscore gp1
+
+retrieve_stored_loop:   pl out mch
+                        ld
+                        pl mem mch
+                        mv gp1 mar
+                        st
+                        mv gp0 acc
+                        ad
+                        jc retrieve_stored_end
+
+                        mv acc gp0
+                        mv gp1 acc
+                        ai
+                        mv acc gp1
+                        pl [1]d mar
+                        jm retrieve_stored_loop
+
+retrieve_stored_end:    rt
+
+reset_filepointer:      pl inp mch
+                        pl [0]d mdr
+                        st
+
+                        rt
+
+increment_score:        pl mem mch
+                        pl [1]d dat
+                        pl score_1s mar
+                        pl [3]d gp1 ; Do 3 digits maximum
+
+                        ; Increment digit (as string) and if it reaches '10' set it back to 0 and increment next digit:
+
+increment_loop:         ld
+                        mv mdr acc
+                        ai
+                        mv acc gp0
+                        pl [:]s dat
+                        ne
+                        pl [0]d dat
+                        js write_score_digit
+
+                        pl [0]s gp0
+                        pl [1]d dat
+
+write_score_digit:      ; End if next digit need not be updated or reached digit cap:
+
+                        mv gp0 mdr
+                        st
+                        mv gp1 acc
+                        ad
+                        jc update_highscore
+                        mv acc gp1
+                        mv dat acc
+                        jc update_highscore
+
+                        ; Otherwise, move onto next digit:
+
+                        mv mar acc
+                        ad
+                        mv acc mar
+                        jm increment_loop
+
+update_highscore:       ; Set the highscore to the current score if the current score is greater:
+
+                        pl highscore score_to_load
+                        cl load_score
+                        mv acc gp1
+                        pl score score_to_load
+                        cl load_score
+                        mv gp1 dat
+                        le
+                        js update_window_title 
+
+                        cl set_new_highscore
+                        
+update_window_title:    ; Update window title with score display:
+
+                        pl out mch
+                        pl [2]d mar
+                        pl set_window_title mdr
+                        st
+
+                        rt
+
+set_new_highscore:      ; Overwrite the highscore with the current score:
+
+                        pl [3]d gp0
+                        pl score gp1
+                        pl highscore gp2
+                        pl score mar
+
+set_new_highscore_loop: ld
+                        mv gp2 mar
+                        st
+                        mv gp0 acc
+                        ad
+                        jc set_new_highscore_end
+
+                        mv acc gp0
+                        mv gp2 acc
+                        ai
+                        mv acc gp2
+                        mv gp1 acc
+                        ai
+                        mv acc gp1
+                        mv gp1 mar
+                        jm set_new_highscore_loop
+
+set_new_highscore_end:  rt
+
+score_to_load=          [1]d ; mar
+
+load_score:             ; put a score at the address in mar into the acc in bcd form ([1byte 100s][1byte 10s][1byte 1s]):
+
+                        pl [3]d gp0
+                        pl [0]d acc
+
+load_score_loop:        ld
+                        mv mdr dat
+                        a|
+                        pl [8]d dat
+                        al
+                        mv acc dat
+
+                        mv gp0 acc
+                        ad
+                        jc load_score_end
+
+                        mv acc gp0
+                        mv mar acc
+                        ai
+                        mv acc mar
+                        mv dat acc
+                        jm load_score_loop
+
+load_score_end:         mv dat acc
+                        rt
+
+reposition_apple:       ; apple_x = rand % GRID_WIDTH, apple_y = rand % GRID_HEIGHT:
+
+                        cl get_rand
+
+                        mv acc gp0
+                        pl GRID_WIDTH dat
+                        a/
+                        a*
+                        mv acc dat
+                        mv gp0 acc
+                        a-
+                        pl apple_x mar
+                        mv acc mdr
+                        mv acc gp1
+                        st
+
+                        cl get_rand
+
+                        mv acc gp0
+                        pl GRID_HEIGHT dat
+                        a/
+                        a*
+                        mv acc dat
+                        mv gp0 acc
+                        a-
+                        pl apple_y mar
+                        mv acc mdr
+                        mv acc gp2
+                        st
+
+                        pl snake mar
+                        ld
+
+                        ; Check if new apple position is inside of snake:
+
+apple_collision_check:  ; Check if snake segment is equal to new apple position:
+
+                        mv gp1 acc
+                        mv mdr dat
+                        ne
+                        pl [2]d dat
+                        js apple_not_in_seg
+
+                        mv mar acc
+                        ai
+                        mv acc mar
+                        ld
+                        mv gp2 acc
+                        mv mdr dat
+                        eq
+                        pl [1]d dat
+                        js reposition_apple ; If it is inside the snake, restart the function
+
+                        ; If it isn't, move onto the next segment until the end of the snake is reached:
+
+apple_not_in_seg:       mv mar acc
+                        a+
+                        mv acc mar
+                        ld
+                        mv mdr acc
+                        pl GRID_WIDTH dat
+                        ne
+                        js apple_collision_check
+
+                        rt
+
+get_rand:               ; rand = (RAND_LCG_A * rand) % RAND_LCG_M:
+
+                        pl mem mch
+                        pl rand mar
+                        ld
+
+                        mv mdr acc
+                        pl RAND_LCG_A dat
+                        a*
+                        mv acc gp0
+
+                        pl RAND_LCG_M dat
+                        a/
+                        a*
+                        mv acc dat
+                        mv gp0 acc
+                        a-
+
+                        mv acc mdr
+                        st
+
+                        rt
+                        
+
+grow_snake:             pl mem mch
+
+                        ; Increase move_1st_index to next segment:
+
+                        pl move_1st_index mar
+                        ld
+                        mv mdr acc
+                        ai
+                        ai
+                        mv acc mdr
+                        st
+
+                        ; Add new (0, 0) segment:
+
+                        pl [0]d mdr
+                        ai
+                        ai
+                        mv acc mar
+                        st
+                        ai
+                        mv acc mar
+                        st
+
+                        ; Re-terminate the snake with GRID_WIDTH:
+
+                        pl GRID_WIDTH mdr
+                        ai
+                        mv acc mar
+                        st
+                        
+                        rt                        
+
+snake_collision=        [9]d ; gp2
+snake_apple_collision=  [10]d ; gp3
+
+detect_snake_collision: pl [0]d snake_collision
+                        pl [0]d snake_apple_collision
+
+                        ; Set gp0 = snake head's x, gp1 = snake head's y:
+
+                        pl mem mch
+                        pl snake mar
+                        ld
+                        mv mdr gp0
+                        pl snake_head_y mar
+                        ld
+                        mv mdr gp1
+
+                        ; Detect if they're within the borders:
+
+                        mv gp0 acc
+                        pl GRID_WIDTH dat
+                        ge
+                        js border_collision
+                        mv gp1 acc
+                        pl GRID_HEIGHT dat
+                        ge
+                        js border_collision 
+
+                        ; Detect if they're at the apple:
+
+                        mv gp0 acc
+                        pl apple_x mar
+                        ld
+                        mv mdr dat
+                        ne
+                        js self_search_start
+                        mv gp1 acc
+                        pl apple_y mar
+                        ld
+                        mv mdr dat
+                        eq
+                        js apple_collision
+
+                        ; Detect if they're not touching any other segment of the snake:
+
+self_search_start:      pl snake_search_start mar ; Get ready for checking other segments (head can't collide with segments 0, 1, 2, 3, so don't bother checking those)
+
+                        ; Detection loop:
+
+self_collision_search:  ; Return if reached the end of the snake:
+
+                        ld
+                        mv mdr acc
+                        pl GRID_WIDTH dat
+                        eq
+                        js detect_collision_end
+
+                        ; Otherwise, check if head coords are the same as current segment's coords:
+
+                        mv mdr acc
+                        mv gp0 dat
+                        eq
+                        pl [2]d dat
+                        jc no_collision_detected
+                        mv mar acc
+                        ai
+                        mv acc mar
+                        ld
+                        mv mdr acc
+                        mv gp1 dat
+                        eq
+                        pl [1]d dat
+                        jc no_collision_detected
+
+                        ; If they are, the snake is colliding with itself:
+
+border_collision:       pl [1]d snake_collision
+detect_collision_end:   rt
+
+                        ; Otherwise, move onto checking the next segment:
+                        
+no_collision_detected:  mv mar acc
+                        a+
+                        mv acc mar
+                        jm self_collision_search
+
+apple_collision:        pl [1]d snake_apple_collision
+                        rt
+
+process_input:          pl [3]d mar
+
+                        ; Return if there were no keypress events:
+
+                        pl out mch
+                        ld
+                        mv mdr acc
+                        jc process_input_end
+
+                        ; If there were input events, return if they were anything other than pressed:
+
+                        pl inp mch
+                        ld
+
+                        mv mdr acc
+                        pl [00'00'ff'00'00'00'00'00]x dat
+                        a&
+                        pl [00'00'01'00'00'00'00'00]x dat
+                        ne
+                        js process_input_end
+
+                        ; Otherwise, get the key code:
+
+                        mv mdr acc
+                        pl [00'00'00'00'ff'ff'ff'ff]x dat
+                        a&
+                        pl KEY_BASE dat
+                        a- ; Normalise its value to one of 0, 1, 2, 3 for arrow keys or above this for any other key
+                        mv acc gp0
+                        pl KEY_MAX dat
+                        gt
+                        js process_input_end ; Return if it was not an arrow key
+                        mv gp0 acc ; If it was an arrow key, multiply it by two (0, 2, 4, 6) for jump table (jm xxx takes up two addresses)
+                        pl [1]d dat
+                        al
+
+                        ; Change the input direction using a jump table for the inputted arrow key:
+
+                        pl process_input_jumps dat
+                        a+
+
+process_input_jumps:    mv acc cea ; Note that the addition to the value of the CEA happens only after each instruction is executed, meaning that after process_input_jumps is added to acc, then moved to the cea, the length of the instruction moving it there will be added to it.
+
+                        jm input_right
+                        jm input_left
+                        jm input_down
+                        jm input_up
+
+input_right:            pl MOVE_LEFT dat ; Right arrow
+                        pl MOVE_RIGHT gp0
+                        pl [1]d gp1
+                        pl [0]d gp2
+                        jm input_direction_change
+
+input_left:             pl MOVE_RIGHT dat ; Left arrow
+                        pl MOVE_LEFT gp0
+                        pl [ff'ff'ff'ff'ff'ff'ff'ff]x gp1
+                        pl [0]d gp2
+                        jm input_direction_change
+                        
+input_down:             pl MOVE_UP dat ; Down arrow
+                        pl MOVE_DOWN gp0
+                        pl [0]d gp1
+                        pl [ff'ff'ff'ff'ff'ff'ff'ff]x gp2
+                        jm input_direction_change
+
+input_up:               pl MOVE_DOWN dat ; Up arrow
+                        pl MOVE_UP gp0
+                        pl [0]d gp1
+                        pl [1]d gp2
+
+                        ; Write the changes to the snake_direction variables:
+
+input_direction_change: pl mem mch
+
+                        ; Don't change direction if new direction is opposite current one:
+
+                        pl snake_direction_move mar
+                        ld
+                        mv mdr acc
+                        eq
+                        js process_input_end
+
+                        ; Update snake direction:
+
+                        mv gp0 mdr
+                        pl snake_direction_move mar
+                        st
+
+                        pl snake_direction_x mar
+                        mv gp1 mdr
+                        st
+                        pl snake_direction_y mar
+                        mv gp2 mdr
+                        st
+
+process_input_end:      rt
+
+move_current_x=         [7]d ; gp0
+move_current_y=         [8]d ; gp1
+move_current_index=     [9]d ; gp2
+
+move_snake:             pl mem mch
+                        pl move_1st_index mar
+                        ld
+                        mv mdr move_current_index
+                        pl snake dat
+
+move_snake_loop:        ; Get snake[move_current_index] x and y:
+
+                        mv move_current_index mar
+                        ld
+                        mv mdr move_current_x
+                        mv move_current_index acc
+                        ai
+                        mv acc mar
+                        ld
+                        mv mdr move_current_y
+
+                        ; Store them in snake[move_current_index + 1] x and y:
+
+                        ai
+                        mv acc mar
+                        mv move_current_x mdr
+                        st
+                        ai
+                        mv acc mar
+                        mv move_current_y mdr
+                        st
+
+                        ; --move_current_index:
+
+                        mv move_current_index acc
+                        ad
+                        ad
+                        mv acc move_current_index
+
+                        ; loop unless snake is fully moved:
+
+                        ge
+                        js move_snake_loop
+
+                        ; Update the head of the snake to be at its next position according to the direction it's travelling in:
+
+                        pl snake_direction_x mar
+                        ld
+                        mv mdr dat
+                        pl snake mar
+                        ld
+                        mv mdr acc
+                        a+
+                        mv acc mdr
+                        st
+
+                        pl snake_direction_y mar
+                        ld
+                        mv mdr dat
+                        pl snake_head_y mar
+                        ld
+                        mv mdr acc
+                        a+
+                        mv acc mdr
+                        st
+
+                        rt
+
+draw_background:        pl out mch
+                        pl [2]d mar
+
+                        pl draw_bg_triangle_bl mdr
+                        st
+                        pl draw_bg_triangle_tr mdr
+                        st
+
+                        rt
+
+draw_apple:             pl mem mch
+
+                        pl apple_y mar
+                        ld
+                        mv mdr grid_square_y
+                        pl apple_x mar
+                        ld
+                        cl draw_grid_square
+
+                        rt
+
+draw_snake:             cl set_colour_to_snake
+
+                        pl snake mar
+                        pl GRID_WIDTH dat
+                        ld
+
+                        ; Loop through snake and draw each segment until GRID_WIDTH is found for the x co-ordinate:
+
+draw_snake_loop:        mv mdr gp3
+                        mv mar acc
+                        ai
+                        mv acc mar
+                        ld
+                        mv mdr grid_square_y
+                        mv gp3 grid_square_x
+
+                        ai
+                        mv acc gp3
+                        cl draw_grid_square
+
+                        pl mem mch
+                        mv gp3 mar
+                        ld
+                        mv mdr acc
+                        ne
+                        js draw_snake_loop
+
+                        rt
+
+set_colour_to_snake:    pl [255]d mdr
+                        jm set_colour
+
+set_colour_to_apple:    pl [0]d mdr
+
+set_colour:             pl mem mch
+                        pl triangle_colour_g mar
+                        st
+                        pl triangle_colour_b mar
+                        st
+
+                        rt
+
+grid_square_x=          [2]d ; mdr
+grid_square_y=          [7]d ; gp0
+
+draw_grid_square:       pl mem mch
+
+                        ; triangle_vertex_1_x = grid_square_x,
+                        ; triangle_vertex_2_x = grid_square_x,
+                        ; triangle_vertex_3_x = grid_square_x + 1:
+
+                        pl triangle_vertex_1_x mar
+                        st
+                        pl triangle_vertex_2_x mar
+                        st
+                        mv mdr acc
+                        ai
+                        mv acc mdr
+                        mv mdr gp1
+                        pl triangle_vertex_3_x mar
+                        st
+
+                        ; triangle_vertex_1_y = grid_square_y,
+                        ; triangle_vertex_2_y = grid_square_y + 1,
+                        ; triangle_vertex_3_y = grid_square_y:
+
+                        mv grid_square_y mdr
+                        pl triangle_vertex_1_y mar
+                        st
+                        pl triangle_vertex_3_y mar
+                        st
+                        mv mdr acc
+                        ai
+                        mv acc mdr
+                        mv mdr gp2
+                        pl triangle_vertex_2_y mar
+                        st
+
+                        ; Draw triangle bottom left:
+
+                        pl out mch
+                        pl [2]d mar
+                        pl draw_triangle mdr
+                        st
+
+                        ; triangle_vertex_1 = (grid_square_x + 1, grid_square_y + 1):
+
+                        pl mem mch
+                        mv gp1 mdr
+                        pl triangle_vertex_1_x mar
+                        st
+                        mv gp2 mdr
+                        pl triangle_vertex_1_y mar
+                        st
+
+                        ; Draw triangle top right:
+
+                        pl out mch
+                        pl [2]d mar
+                        pl draw_triangle mdr
+                        st
+
+                        rt
+
+; Constants:
+
+GRID_WIDTH=             [16]d
+GRID_HEIGHT=            [16]d
+
+KEY_BASE=               [262]d
+KEY_MAX=                [3]d
+KEY_UP=                 [6]d
+KEY_DOWN=               [4]d
+KEY_LEFT=               [2]d
+KEY_RIGHT=              [0]d
+
+MOVE_UP=                [0]d
+MOVE_DOWN=              [1]d
+MOVE_LEFT=              [2]d
+MOVE_RIGHT=             [3]d
+
+RAND_LCG_M=             [65'537]d ; Same parameters the ZX81 & ZX Spectrum used :D
+RAND_LCG_A=             [75]d
+
+; Screen Buffer instructions:
+
+show_window:            [3]d [1]d
+
+set_window_title:       [2]d
+                        [33]d
+                        [Snake - Score ]s
+score:                  [0]s
+                        [0]s
+score_1s:               [0]s
+                        [ - Highscore ]s
+highscore:              [0]s
+                        [0]s
+highscore_1s:           [0]s
+
+set_working_dimensions: [1]d GRID_WIDTH GRID_HEIGHT [ff'ff'ff'ff'ff'ff'ff'fe]x
+
+clear_buffers:          [9]d
+
+swap_buffers:           [7]d
+
+get_window_closure:     [10]d
+window_closure:         [0]d
+
+draw_triangle:          [6]d
+                        [255]d
+triangle_colour_g:      [0]d
+triangle_colour_b:      [0]d
+                        [255]d
+triangle_vertex_1_x:    [0]d
+triangle_vertex_1_y:    [0]d
+                        [ff'ff'ff'ff'ff'ff'ff'ff]x
+triangle_vertex_2_x:    [0]d
+triangle_vertex_2_y:    [0]d
+                        [ff'ff'ff'ff'ff'ff'ff'ff]x
+triangle_vertex_3_x:    [0]d
+triangle_vertex_3_y:    [0]d
+                        [ff'ff'ff'ff'ff'ff'ff'ff]x
+
+draw_bg_triangle_bl:    [6]d
+                        [127]d [127]d [127]d [255]d
+                        [0]d [0]d [ff'ff'ff'ff'ff'ff'ff'ff]x
+                        [0]d GRID_HEIGHT [ff'ff'ff'ff'ff'ff'ff'ff]x
+                        GRID_WIDTH [0]d [ff'ff'ff'ff'ff'ff'ff'ff]x
+
+draw_bg_triangle_tr:    [6]d
+                        [127]d [127]d [127]d [255]d
+                        GRID_WIDTH GRID_HEIGHT [ff'ff'ff'ff'ff'ff'ff'ff]x
+                        [0]d GRID_HEIGHT [ff'ff'ff'ff'ff'ff'ff'ff]x
+                        GRID_WIDTH [0]d [ff'ff'ff'ff'ff'ff'ff'ff]x
+
+; Variables:
+
+rand:                   [28'653]d
+
+highscore:              [0]d
+score:                  [0]d
+
+apple_x:                [10]d
+apple_y:                [14]d
+
+snake_direction_move:   MOVE_LEFT
+snake_direction_x:      [ff'ff'ff'ff'ff'ff'ff'ff]x
+snake_direction_y:      [0]d
+
+move_1st_index:         move_1st_index_initial
+
+snake:                  [8]d
+snake_head_y:           [8]d
+                        [9]d [8]d
+move_1st_index_initial: [10]d [8]d
+                        [11]d [8]d
+snake_search_start:     GRID_WIDTH
