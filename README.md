@@ -9,5 +9,5 @@ https://github.com/user-attachments/assets/408a8e5b-93b4-484e-81ec-d7ae712acc88
 
 ### Installation
 
-https://github.com/user-attachments/assets/38e61cf1-0920-456a-8a63-80ab9bfbd75c
+https://github.com/user-attachments/assets/c29e1951-b4de-464e-a9a9-89692ab5eb2a
 
