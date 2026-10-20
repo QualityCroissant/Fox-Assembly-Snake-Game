@@ -11,3 +11,5 @@ https://github.com/user-attachments/assets/408a8e5b-93b4-484e-81ec-d7ae712acc88
 
 https://github.com/user-attachments/assets/c29e1951-b4de-464e-a9a9-89692ab5eb2a
 
+### AI Policy
+<img width="1276" height="440" alt="Screenshot_2026-10-21_00-16-06" src="https://github.com/user-attachments/assets/697a6847-03a7-46ee-bb77-f2c3bd00155c" />
